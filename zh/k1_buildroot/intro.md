@@ -40,7 +40,7 @@ SDK包含的组件如下：
 
 - [镜像](image.md)
 - [源码](source.md)
-- [工具](tools.md)
+- [工具](../tools.md)
 
 ## 更新说明
 
