@@ -2,7 +2,7 @@
 sidebar_position: 2
 ---
 
-# K1 Buildroot
+# K3 Buildroot
 
 - [简介](intro.md)
 - [镜像](image.md)
