@@ -1,4 +1,8 @@
-# Buildroot
+---
+sidebar_position: 2
+---
+
+# K1 Buildroot
 
 - [Introduction](intro.md)
 - [Images](image.md)
