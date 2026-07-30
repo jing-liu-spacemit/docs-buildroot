@@ -12,3 +12,5 @@ Buildroot Device Development Guides:
 - [Peripheral Drivers](peripheral_driver/index.md)
 - [Standby](standby.md)
 - [Product Line Tool](plt.md)
+- [Production Programming Guide](tlv.md)
+- [HMP (Heterogeneous Multi-Processing) User Guide](hmp.md)
