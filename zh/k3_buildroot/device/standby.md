@@ -1,3 +1,7 @@
+---
+sidebar_position: 6
+---
+
 # 休眠唤醒
 
 介绍 K3 平台 Suspend to RAM 和 Hibernate 的功能与实现。
