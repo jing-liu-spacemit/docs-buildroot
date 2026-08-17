@@ -109,6 +109,7 @@ sdcard: mmc@d4280000 {
         clocks = <&syscon_apmu CLK_APMU_SDH_AXI>,
                  <&syscon_apmu CLK_APMU_SDH0>;
         clock-names = "core", "io";
+        interrupt-parent = <&saplic>;
         interrupts = <99 IRQ_TYPE_LEVEL_HIGH>;
         resets = <&syscon_apmu RESET_APMU_SDH_AXI>,
                  <&syscon_apmu RESET_APMU_SDH0>;
@@ -173,7 +174,54 @@ Where:
 
 - `default`: Default operating mode, using 3.3 V I/O;
 - `uhs`: UHS mode, using 1.8 V I/O. The driver dynamically switches to this pinctrl state when required;
-- `debug`: Used in debug scenarios such as external card debug daughterboards.
+- `debug`: Debug scenarios. Choose one of the following two pinctrl configurations for `pinctrl-2` based on solution requirements:
+  - `mmc1_debug_cfg`: Multiplexes PAD 132/133 (SD DAT3/DAT2) as UART0 TX/RX while keeping other pins as SD functions, used for external debug daughterboard serial output scenarios (see EVB);
+  - `mmc1_jtag_cfg`: Multiplexes PAD 132/133/134/137 (SD DAT3/DAT2/DAT1/CLK) as JTAG TDI/TMS/TDO/TCK, used for JTAG debugging scenarios (see CoM260).
+
+  The driver defaults to the `debug` state during probe. After detecting SD card insertion, it automatically switches to `default` or `uhs` mode, and returns to `debug` after card removal. Therefore, debug functionality is only available when the SD card is not working.
+
+`mmc1_debug_cfg` configuration reference (k3-pinctrl.dtsi, used by EVB):
+
+```dts
+mmc1_debug_cfg: mmc1-debug-cfg {
+        mmc1-0-pins {
+                pinmux = <K3_PADCONF(132, 2)>,  /* uart0 tx */
+                         <K3_PADCONF(133, 2)>,  /* uart0 rx */
+                         <K3_PADCONF(134, 0)>,  /* mmc1 dat1 */
+                         <K3_PADCONF(135, 0)>,  /* mmc1 dat0 */
+                         <K3_PADCONF(136, 0)>;  /* mmc1 cmd */
+
+                bias-pull-up;
+                drive-strength = <8>;
+                power-source = <3300>;
+        };
+
+        mmc1-1-pins {
+                pinmux = <K3_PADCONF(137, 0)>;  /* mmc1 clk */
+
+                bias-pull-down;
+                drive-strength = <8>;
+                power-source = <3300>;
+        };
+};
+```
+
+`mmc1_jtag_cfg` configuration reference (k3-pinctrl.dtsi, used by COM260):
+
+```dts
+mmc1_jtag_cfg: mmc1-jtag-cfg {
+        mmc1-0-pins {
+                pinmux = <K3_PADCONF(132, 5)>,  /* pri tdi */
+                         <K3_PADCONF(133, 5)>,  /* pri tms */
+                         <K3_PADCONF(134, 5)>,  /* pri tdo */
+                         <K3_PADCONF(137, 5)>;  /* pri tck */
+
+                bias-pull-up;
+                drive-strength = <8>;
+                power-source = <3300>;
+        };
+};
+```
 
 The SDIO controller and eMMC controller do not support 1.8 V/3.3 V I/O switching, so only one pinctrl state needs to be configured.
 
@@ -231,9 +279,10 @@ For card detection, the pinctrl configuration must enable pull-up by default, an
 
 ```dts
 &sdcard {
-        pinctrl-names = "default","uhs";
+        pinctrl-names = "default","uhs","debug";
         pinctrl-0 = <&mmc1_cfg &mmc1_cd_cfg>;
         pinctrl-1 = <&mmc1_uhs_cfg &mmc1_cd_cfg>;
+        pinctrl-2 = <&mmc1_jtag_cfg &mmc1_cd_cfg>;
         bus-width = <4>;
         wp-inverted;
         cd-gpios = <&gpio 0 4 GPIO_ACTIVE_HIGH>;
@@ -256,13 +305,25 @@ Key configuration parameters:
 - `no-mmc`: Disables the controller from enumerating eMMC devices. Required for SD card controllers;
 - `no-sdio`: Disables the controller from enumerating SDIO devices. Required for SD card controllers;
 - `clock-frequency`: Specifies the clock source. The SD card uses a 204 MHz clock source, and the maximum controller output frequency is 204 MHz;
-- `spacemit,tx_delaycode`: Specifies the TX tuning parameter. This should be adjusted according to the actual hardware. If it is not configured, the default value is `0x7f`.
+- `spacemit,tx_delaycode`: Specifies the TX tuning parameter. This should be adjusted according to the actual hardware. If it is not configured, the default value is `0x7f`;
+- `spacemit,rx_tuning_limit`: Minimum pass window width (delay code count) required for software RX tuning to succeed. If this value is not met, tuning fails. The default is 50 if not configured, and can be adjusted based on actual hardware tuning results;
+- `spacemit,rx_tuning_type`: RX tuning sampling position within the pass window. `0` = 1/3 point, `1` = center point, `2` = 2/3 point. The default is `1` (center) if not configured;
+- `spacemit,phy_driver_sel`: PHY driver capability selection. The default is `0x4` if not configured.
 
 #### SDIO Configuration Example
 
 `sdio` configuration for K3 EVB:
 
 ```dts
+vmmc_sdio: regulator-vmmc-sdio {
+        compatible = "regulator-fixed";
+        regulator-name = "vmmc-sdio";
+        regulator-min-microvolt = <3300000>;
+        regulator-max-microvolt = <3300000>;
+        enable-active-high;
+        gpio = <&gpio 3 6 GPIO_ACTIVE_HIGH>;
+};
+
 sdio_pwrseq: sdio-pwrseq {
         compatible = "mmc-pwrseq-simple";
 
@@ -282,7 +343,17 @@ sdio_pwrseq: sdio-pwrseq {
         keep-power-in-suspend;
         clock-frequency = <375000000>;
         spacemit,tx_delaycode = <0x7f>;
+        #address-cells = <1>;
+        #size-cells = <0>;
         status = "okay";
+
+        wifi@1 {
+                reg = <1>;
+                compatible = "realtek,rtl8852bs";
+                pinctrl-names = "default";
+                pinctrl-0 = <&wifi_hostwake_cfg>;
+                interrupts-extended = <&pinctrl 101 IRQ_TYPE_EDGE_FALLING>;
+        };
 };
 ```
 
@@ -297,7 +368,8 @@ Key configuration parameters:
 - `keep-power-in-suspend`: Keeps the device powered during system suspend. This is required for scenarios in which connectivity must be maintained or wake-up must be supported, such as Wi-Fi;
 - `clock-frequency`: Specifies the clock source. SDIO uses a 375 MHz clock source, which is divided by 2 inside the controller, so the maximum output frequency is 187 MHz;
 - `spacemit,tx_delaycode`: Specifies the TX delay parameter used for tuning. This must be adjusted according to the actual hardware layout. If not configured, the default value is `0x7f`;
-- `reset-gpios`: Specifies the reset pin for the SDIO device. For Wi-Fi devices, this typically corresponds to `REG_ON`, and the active level should be configured according to actual requirements.
+- `reset-gpios`: Specifies the reset pin for the SDIO device. For Wi-Fi devices, this typically corresponds to `REG_ON`, and the active level should be configured according to actual requirements;
+- `wifi@1`: SDIO child device node. `reg` corresponds to the SDIO function number (1 for Wi-Fi). `compatible` should be filled according to the actual Wi-Fi chip. `interrupts-extended` configures the host wake interrupt pin and requires the corresponding pinctrl (`wifi_hostwake_cfg`) to be configured.
 
 #### eMMC Configuration Example
 
@@ -334,11 +406,15 @@ The K3 driver supports automatic RX tuning, but `tx_delaycode` must be configure
 The following modes require tuning:
 
 - SDR50/SDR104
-- HS200/HS400
+- HS200/HS400 (HS400 completes tuning during the HS200 phase before switching)
+
+Tuning is only performed when the operating frequency is above 100 MHz; the driver skips tuning below this threshold.
 
 For eMMC tuning, the default TX timing is used, so `spacemit,tx_delaycode` does not need to be set in the board DTS. For SD cards and SDIO devices, if `tx_delaycode` is not specified, the default value `0x7f` is used.
 
 If TX CRC errors occur when using an SD card or SDIO module, `spacemit,tx_delaycode` usually needs to be adjusted for further verification.
+
+RX tuning behavior can be fine-tuned using `spacemit,rx_tuning_limit` and `spacemit,rx_tuning_type`: the former controls the minimum pass window width required to determine tuning success—if logs show `fail to find valid tuning window` and the measured window is narrow, this value can be appropriately reduced; the latter controls the delay code sampling position within the pass window, defaulting to the center point and generally not requiring modification.
 
 ## Interface
 
@@ -353,11 +429,25 @@ static const struct sdhci_ops spacemit_sdhci_ops = {
         .set_bus_width           = sdhci_set_bus_width,
         .set_clock               = spacemit_sdhci_set_clock,
         .set_uhs_signaling       = spacemit_sdhci_set_uhs_signaling,
-        .voltage_switch          = spacemit_sdhci_voltage_switch,
         .set_power               = sdhci_set_power_and_bus_voltage,
         .platform_execute_tuning = spacemit_sdhci_execute_sw_tuning,
 };
 ```
+
+In addition, during the probe phase the driver also overrides some callbacks in `mmc_host_ops`:
+
+```c
+mops = &host->mmc_host_ops;
+if (!(host->mmc->caps2 & MMC_CAP2_NO_MMC)) {
+        mops->hs400_prepare_ddr     = spacemit_sdhci_pre_select_hs400;
+        mops->hs400_complete        = spacemit_sdhci_post_select_hs400;
+        mops->hs400_downgrade       = spacemit_sdhci_pre_hs400_to_hs200;
+        mops->hs400_enhanced_strobe = spacemit_sdhci_hs400_enhanced_strobe;
+}
+mops->card_busy = spacemit_sdhci_card_busy;
+```
+
+The first four callbacks only take effect for eMMC controllers and are used for HS400/HS400ES timing switching; `card_busy` is replaced with the platform implementation for all controllers.
 
 The `sdhci.c` driver implements the following interfaces:
 
@@ -388,9 +478,7 @@ By default, the K3 platform does not actively scan for SDIO devices. Active scan
 void spacemit_sdio_detect_change(int enable_scan);
 ```
 
-- `enable_scan = 1`: Triggers active scanning;
-- `enable_scan = 0`: Stops active scanning.
-The Wi-Fi driver invokes this interface with 1 during loading and with 0 during unloading.
+Calling this interface resets the SDIO host rescan state and triggers a device scan. The Wi-Fi driver should call this during loading. The current implementation does not use the `enable_scan` parameter; passing any value triggers a scan.
 
 ### Debugging
 
