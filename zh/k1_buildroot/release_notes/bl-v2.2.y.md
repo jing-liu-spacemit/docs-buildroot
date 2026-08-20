@@ -4,6 +4,20 @@ sidebar_position: 1
 
 # Buildroot 2.2 更新说明
 
+## v2.2.11 更新说明
+
+发布日期：2026-8-20
+
+### 主要更新
+
+- 新增 FUSB301 Type-C 端口控制器支持
+- 新增 Realtek 8821cs WiFi 芯片支持
+- 新增 MIPI LCD icnl9951c 屏幕支持
+- 优化 GPU 启用 SUPPORT_DMA_TRANSFER 功能
+- 优化 LPDDR4 IO 参数以改善信号质量
+- 调整 LPDDR4/4x 频率点从 1600/3200 MTPS 替换为 1066/2133 MTPS
+- 调整 PMU 相关寄存器访问限制为仅 M 模式
+
 ## v2.2.10 更新说明
 
 发布日期：2026-6-5
