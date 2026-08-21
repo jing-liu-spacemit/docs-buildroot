@@ -4,6 +4,20 @@ sidebar_position: 1
 
 # Buildroot 2.2 Release Notes
 
+## v2.2.11 Release Notes
+
+Release date: 2026-8-20
+
+### Major Updates
+
+- Added support for the FUSB301 Type-C port controller
+- Added support for the Realtek 8821CS Wi-Fi chip
+- Added support for the MIPI LCD ICNL9951C display
+- Optimized GPU support for the `SUPPORT_DMA_TRANSFER` feature
+- Optimized LPDDR4 I/O parameters to improve signal quality
+- Changed the LPDDR4/4x frequency points from 1600/3200 MTPS to 1066/2133 MTPS
+- Restricted access to PMU-related registers to machine mode (`M` mode) only
+
 ## v2.2.9 release note
 
 Release date: 2026-1-28

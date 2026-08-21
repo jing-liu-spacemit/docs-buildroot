@@ -151,7 +151,7 @@ The EtherCAT Master driver codes are located in the `drivers/net/ethercat` direc
 | Automatic Slave Configuration | Supports automatic scanning and configuration of connected slave devices, simplifying network setup |
 | Distributed Clock Synchronization | Achieves Distributed Clock (DC) synchronization with precision of less than 1 µs |
 | Multi-protocol Support | Supports protocols such as CoE, SoE, FoE, etc. |
-| High Real-time Performance | Supports a 1 ms DC cycle, meeting the real-time requirements of most industrial applications |
+| High Real-time Performance | Supports a 500-us DC cycle, meeting the real-time requirements of most industrial applications |
 | Multi-master Combination | Supports configuring multiple masters, each of which can manage two network devices: a primary device and a backup device |
 
 ## Configuration
@@ -410,8 +410,8 @@ View master information via `/sys/class/EtherCAT/EtherCAT0`:
 
 EtherCAT master test procedure:
 
-1. Connect the slave device to the master network interface.
-2. Power on and boot the system. The kernel automatically loads EtherCAT master and real-time network card device driver.
+1. Connect the slave device to the master's network interface.
+2. Power on and boot the system. The kernel automatically loads the EtherCAT master and real-time network-card drivers.
 3. The master automatically scans for slaves and outputs logs after successful identification.
 4. The master enters `PREOP` state, waiting for the user applications to run.
 
@@ -429,54 +429,68 @@ The startup log example is as follows:
 
 ```
 
-Test cases can be developed based on `examples/dc_user/main.c` from the [EtherLab official examples](https://gitlab.com/etherlab.org/ethercat). The following example shows the output when testing with one slave under a 1 ms DC communication period:
+Before testing, isolate a CPU with cgroup v2 and run the test program on that CPU to reduce the impact of other scheduled tasks on real-time performance. The following example isolates CPU 2:
+
+```bash
+cd /sys/fs/cgroup
+
+echo +cpuset > cgroup.subtree_control
+mkdir -p rt-cpu2
+echo 2 > rt-cpu2/cpuset.cpus
+echo isolated > rt-cpu2/cpuset.cpus.partition
+```
+
+Run the test program on the isolated CPU:
+
+```bash
+bash -c '
+echo $$ > /sys/fs/cgroup/rt-cpu2/cgroup.procs
+exec env EC_RT_CPU=2 /path/to/test_program
+'
+```
+
+Test cases can be developed based on `examples/dc_user/main.c` from the [EtherLab official examples](https://gitlab.com/etherlab.org/ethercat). The following example shows the output from a 24-hour test with one slave and a 500-us DC communication period:
 
 ```c
-period         995180 ...    1004620
-exec             4680 ...      48215
-latency          3125 ...       7421
-
-period         995420 ...    1004875
-exec             4755 ...      47106
-latency          3268 ...       7354
-
-period         995060 ...    1004510
-exec             4898 ...      46892
-latency          3415 ...       7288
-
-period         995330 ...    1004790
-exec             4528 ...      47936
-latency          3372 ...       7410
-
-period         995210 ...    1004685
-exec             4680 ...      48524
-latency          3291 ...       7398
-
-period         995560 ...    1004980
-exec             4712 ...      47680
-latency          3446 ...       7305
-
-period         995140 ...    1004565
-exec             4586 ...      48312
-latency          3218 ...       7442
-
-period         995470 ...    1004890
-exec             4864 ...      46975
-latency          3364 ...       7386
-
-period         995090 ...    1004470
-exec             4638 ...      48744
-latency          3482 ...       7468
-
-period         995380 ...    1004760
-exec             4781 ...      47296
-latency          3337 ...       7349
+progress: 86393/86400
+period        485042 ...   517083
+exec            6709 ...   39833
+latency         3843 ...   21318
+progress: 86394/86400
+period        485042 ...   517083
+exec            6709 ...   39833
+latency         3843 ...   21318
+progress: 86395/86400
+period        485042 ...   517083
+exec            6709 ...   39833
+latency         3843 ...   21318
+progress: 86396/86400
+period        485042 ...   517083
+exec            6709 ...   39833
+latency         3843 ...   21318
+progress: 86397/86400
+period        485042 ...   517083
+exec            6709 ...   39833
+latency         3843 ...   21318
+progress: 86398/86400
+period        485042 ...   517083
+exec            6709 ...   39833
+latency         3843 ...   21318
+progress: 86399/86400
+period        485042 ...   517083
+exec            6709 ...   39833
+latency         3843 ...   21318
+progress: 86400/86400
+period        485042 ...   517083
+exec            6709 ...   39833
+latency         3843 ...   21318
+[84309.611731] EtherCAT 0: Releasing master
 ```
 
 **Note:**
 
-- `period`: The values in the period row represent the fluctuation range of the communication cycle within one second.
-- `exec`: The values in the exec row represent the fluctuation range of the master’s periodic task execution time within one second.
-- `latency`: The values in the latency row represent the fluctuation range of the master's wake-up latency within one second.
+- `period`: The values represent the fluctuation range of the communication cycle over the entire test.
+- `exec`: The values represent the fluctuation range of the master's periodic task execution time over the entire test.
+- `latency`: The values represent the fluctuation range of the master's wake-up latency over the entire test.
 
 ## FAQ
