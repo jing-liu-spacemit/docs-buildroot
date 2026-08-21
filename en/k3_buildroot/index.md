@@ -12,5 +12,6 @@ sidebar_position: 2
 - [Device Development](./device/index.md)
 - [Multimedia](./media/index.md)
 - [Graphics Development](./graphics/index.md)
+- [DPDK Development](./dpdk/index.md)
 - [Kernel Debug](./kernel_debug/index.md)
 - [FAQ](faqs.md)
